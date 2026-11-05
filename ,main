@@ -1,0 +1,537 @@
+import 'package:flutter/material.dart';
+
+void main() => runApp(const SmartQueueApp());
+
+class SmartQueueApp extends StatelessWidget {
+  const SmartQueueApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'SmartQueue',
+      theme: ThemeData(
+        colorSchemeSeed: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const MainScreen(),
+    );
+  }
+}
+
+const Map<String, List<String>> services = {
+  'Hospital': [
+    'General Consultation',
+    'Doctor Appointment',
+    'Lab Test Registration',
+    'Pharmacy',
+  ],
+  'Bank': [
+    'Account Opening Enquiry',
+    'Cash Deposit Enquiry',
+    'Passbook Update',
+    'Customer Support',
+  ],
+  'Passport Office': [
+    'New Passport Enquiry',
+    'Passport Renewal',
+    'Document Verification',
+    'Application Status',
+  ],
+  'College': [
+    'College Fee Enquiry',
+    'Exam Fee Enquiry',
+    'Certificate Request',
+    'Admission Enquiry',
+  ],
+  'Other Services': [
+    'Government Service Enquiry',
+    'Document Assistance',
+    'Customer Support',
+    'General Enquiry',
+  ],
+};
+
+const Map<String, IconData> serviceIcons = {
+  'Hospital': Icons.local_hospital,
+  'Bank': Icons.account_balance,
+  'Passport Office': Icons.flight,
+  'College': Icons.school,
+  'Other Services': Icons.miscellaneous_services,
+};
+
+class Booking {
+  final String name;
+  final String category;
+  final String service;
+  final int token;
+
+  Booking(this.name, this.category, this.service, this.token);
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int selectedTab = 0;
+  int nextToken = 101;
+  Booking? booking;
+
+  void showPage(Widget page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+  }
+
+  Future<void> startBooking(String category, String service) async {
+    if (booking != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cancel your current booking first.')),
+      );
+      return;
+    }
+
+    final result = await Navigator.push<Booking>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingPage(
+          category: category,
+          service: service,
+          token: nextToken,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        booking = result;
+        nextToken++;
+        selectedTab = 2;
+      });
+      showPage(ConfirmationPage(booking: result));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      HomePage(onSelect: (category) {
+        setState(() => selectedTab = 1);
+      }),
+      ServicesPage(onSelect: (category, service) {
+        startBooking(category, service);
+      }),
+      QueuePage(
+        booking: booking,
+        onCancel: () => setState(() => booking = null),
+      ),
+      ProfilePage(onOpen: showPage),
+    ];
+
+    return Scaffold(
+      body: SafeArea(child: pages[selectedTab]),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedTab,
+        onDestinationSelected: (index) {
+          setState(() => selectedTab = index);
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.apps), label: 'Services'),
+          NavigationDestination(icon: Icon(Icons.confirmation_number),
+              label: 'My Queue'),
+          NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+// HOME SCREEN
+class HomePage extends StatelessWidget {
+  final Function(String) onSelect;
+  const HomePage({super.key, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        const Text('SmartQueue',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+        const Text('Book your service. Save your time.',
+            style: TextStyle(color: Colors.grey)),
+        const SizedBox(height: 25),
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Welcome to SmartQueue',
+                  style: TextStyle(color: Colors.white, fontSize: 21,
+                      fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Text('Book a token online and reduce waiting time.',
+                  style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const Text('Available Services',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        ...services.keys.map((category) => Card(
+          child: ListTile(
+            leading: Icon(serviceIcons[category], color: Colors.blue),
+            title: Text(category),
+            subtitle: const Text('Explore available services'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () => onSelect(category),
+          ),
+        )),
+        const SizedBox(height: 15),
+        const Text('How it works',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+        const ListTile(
+          leading: Icon(Icons.touch_app, color: Colors.blue),
+          title: Text('1. Choose a service'),
+        ),
+        const ListTile(
+          leading: Icon(Icons.edit, color: Colors.blue),
+          title: Text('2. Enter your details'),
+        ),
+        const ListTile(
+          leading: Icon(Icons.confirmation_number, color: Colors.blue),
+          title: Text('3. Get your token'),
+        ),
+      ],
+    );
+  }
+}
+
+// SERVICES SCREEN
+class ServicesPage extends StatelessWidget {
+  final Function(String, String) onSelect;
+  const ServicesPage({super.key, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text('All Services',
+            style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ...services.entries.map((entry) => Card(
+          child: ExpansionTile(
+            leading: Icon(serviceIcons[entry.key], color: Colors.blue),
+            title: Text(entry.key,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            children: entry.value.map((service) => ListTile(
+              title: Text(service),
+              trailing: const Icon(Icons.arrow_forward),
+              onTap: () => onSelect(entry.key, service),
+            )).toList(),
+          ),
+        )),
+      ],
+    );
+  }
+}
+
+// BOOKING FORM
+class BookingPage extends StatefulWidget {
+  final String category;
+  final String service;
+  final int token;
+
+  const BookingPage({
+    super.key,
+    required this.category,
+    required this.service,
+    required this.token,
+  });
+
+  @override
+  State<BookingPage> createState() => _BookingPageState();
+}
+
+class _BookingPageState extends State<BookingPage> {
+  final nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    super.dispose();
+  }
+
+  void confirmBooking() {
+    final name = nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name')),
+      );
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      Booking(name, widget.category, widget.service, widget.token),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Book Your Service')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.category,
+                style: const TextStyle(fontSize: 23,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            Text('Selected Service: ${widget.service}'),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Enter Your Name',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: confirmBooking,
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Confirm Booking'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// BOOKING CONFIRMATION
+class ConfirmationPage extends StatelessWidget {
+  final Booking booking;
+  const ConfirmationPage({super.key, required this.booking});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Booking Confirmation')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 75),
+              const Text('Booking Successful!',
+                  style: TextStyle(fontSize: 24,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              Text('Token Number: ${booking.token}',
+                  style: const TextStyle(fontSize: 25, color: Colors.blue)),
+              const SizedBox(height: 12),
+              Text('Name: ${booking.name}'),
+              Text('Category: ${booking.category}'),
+              Text('Service: ${booking.service}'),
+              const SizedBox(height: 25),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// MY QUEUE SCREEN
+class QueuePage extends StatelessWidget {
+  final Booking? booking;
+  final VoidCallback onCancel;
+
+  const QueuePage({
+    super.key,
+    required this.booking,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (booking == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.queue, size: 75, color: Colors.grey),
+            SizedBox(height: 12),
+            Text('No Active Booking',
+                style: TextStyle(fontSize: 22,
+                    fontWeight: FontWeight.bold)),
+            Text('Book a service to view your token here.'),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.confirmation_number,
+              size: 65, color: Colors.blue),
+          const Text('Your Queue Details',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Text('Token: ${booking!.token}',
+              style: const TextStyle(fontSize: 28, color: Colors.blue)),
+          Text('Name: ${booking!.name}'),
+          Text('Category: ${booking!.category}'),
+          Text('Service: ${booking!.service}'),
+          const SizedBox(height: 15),
+          const Text('Waiting time: Awaiting queue information'),
+          const SizedBox(height: 25),
+          ElevatedButton.icon(
+            onPressed: () => showDialog(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Cancel Booking?'),
+                content: const Text('Do you want to cancel this booking?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('No'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      onCancel();
+                      Navigator.pop(dialogContext);
+                    },
+                    child: const Text('Yes, Cancel'),
+                  ),
+                ],
+              ),
+            ),
+            icon: const Icon(Icons.cancel),
+            label: const Text('Cancel Booking'),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// PROFILE SCREEN
+class ProfilePage extends StatelessWidget {
+  final Function(Widget) onOpen;
+  const ProfilePage({super.key, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = {
+      'My Details': Icons.person,
+      'About SmartQueue': Icons.info,
+      'Help & Support': Icons.help,
+      'Contact Us': Icons.contact_support,
+      'Privacy Policy': Icons.privacy_tip,
+    };
+
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        const CircleAvatar(
+          radius: 42,
+          child: Icon(Icons.person, size: 45),
+        ),
+        const SizedBox(height: 12),
+        const Center(child: Text('My Profile',
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold))),
+        const SizedBox(height: 20),
+        ...items.entries.map((item) => Card(
+          child: ListTile(
+            leading: Icon(item.value, color: Colors.blue),
+            title: Text(item.key),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () => onOpen(InfoPage(title: item.key)),
+          ),
+        )),
+      ],
+    );
+  }
+}
+
+// PROFILE DETAIL PAGES
+class InfoPage extends StatelessWidget {
+  final String title;
+  const InfoPage({super.key, required this.title});
+
+  String get description {
+    switch (title) {
+      case 'My Details':
+        return 'View your SmartQueue profile information. Personal details can be added in a future version.';
+      case 'About SmartQueue':
+        return 'SmartQueue is a digital queue booking application. It helps users select services and generate tokens.';
+      case 'Help & Support':
+        return 'For assistance, check your booking details and token number. Contact the service provider for actual queue updates.';
+      case 'Contact Us':
+        return 'SmartQueue Support\nEmail: support@example.com\nPhone: Contact your service provider.';
+      default:
+        return 'Your booking details should be handled securely. Do not enter passwords, bank PINs or sensitive identity information in this demo.';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              title == 'My Details' ? Icons.person :
+              title == 'About SmartQueue' ? Icons.info :
+              title == 'Help & Support' ? Icons.help :
+              title == 'Contact Us' ? Icons.contact_support :
+              Icons.privacy_tip,
+              size: 55,
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(
+                fontSize: 23, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(description, style: const TextStyle(fontSize: 17)),
+          ],
+        ),
+      ),
+    );
+  }
+}
